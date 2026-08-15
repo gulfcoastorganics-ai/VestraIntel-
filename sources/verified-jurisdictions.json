@@ -1,0 +1,38 @@
+[
+  {
+    "jurisdiction": "New York",
+    "verified_on": "2026-08-14",
+    "official_url": "https://www.osc.ny.gov/unclaimed-funds/resources/location-service-providers",
+    "fee_cap_percent": 15,
+    "registration_or_license": "No separate PI/finder license identified on the cited OSC provider page; provider procedures and a notarized owner fee agreement apply.",
+    "bulk_data": "Quarterly zipped delimited owner-name file available after online request via secure download; values/TINs excluded and some records omitted from the file.",
+    "production_gate": "agreement_required"
+  },
+  {
+    "jurisdiction": "Pennsylvania",
+    "verified_on": "2026-08-12",
+    "official_url": "https://www.patreasury.gov/Unclaimed-Property/finder/",
+    "fee_cap_percent": 15,
+    "registration_or_license": "Pennsylvania Treasury Certificate of Finder Registration required before compensated recovery assistance.",
+    "bulk_data": "Not yet verified for automated bulk use in this build.",
+    "production_gate": "registration_required"
+  },
+  {
+    "jurisdiction": "California",
+    "verified_on": "2026-08-14",
+    "official_url": "https://www.sco.ca.gov/upd_investigators.html",
+    "fee_cap_percent": 10,
+    "registration_or_license": "SCO publishes investigator procedures/forms and a 10% general fee cap; separate licensing/contract law review remains required for the operator and activity.",
+    "bulk_data": "Official statewide CSV archives by value band and all-records file; source page states files update every Thursday.",
+    "production_gate": "agreement_and_law_review"
+  },
+  {
+    "jurisdiction": "Mississippi",
+    "verified_on": "2026-08-12",
+    "official_url": "https://treasury.ms.gov/for-citizens/unclaimed-property/learn/",
+    "fee_cap_percent": 10,
+    "registration_or_license": "Treasury FAQ confirms claim finders may charge up to 10%; licensing/contract details require separate verification before production outreach.",
+    "bulk_data": "Not yet verified for automated bulk use in this build.",
+    "production_gate": "law_review_required"
+  }
+]

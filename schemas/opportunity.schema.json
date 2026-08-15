@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Forgotten Asset Intelligence Opportunity",
+  "type": "object",
+  "required": ["source_id", "external_id", "asset_class", "title", "jurisdiction", "custodian", "source_url", "legal_model"],
+  "properties": {
+    "source_id": {"type": "string"},
+    "external_id": {"type": "string"},
+    "asset_class": {"type": "string"},
+    "title": {"type": "string"},
+    "owner_name": {"type": ["string", "null"]},
+    "jurisdiction": {"type": "string"},
+    "custodian": {"type": "string"},
+    "face_value": {"type": ["string", "null"]},
+    "currency": {"type": ["string", "null"]},
+    "published_at": {"type": ["string", "null"], "format": "date"},
+    "claim_deadline": {"type": ["string", "null"], "format": "date"},
+    "source_url": {"type": "string", "format": "uri"},
+    "legal_model": {"type": "string"},
+    "compliance_status": {"type": "string"},
+    "score": {"type": "number", "minimum": 0, "maximum": 100}
+  }
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "uk_unclaimed_estates",
+    "official_url": "https://www.gov.uk/government/statistical-data-sets/unclaimed-estates-list",
+    "machine_readable": true,
+    "ingestion": "implemented",
+    "action_gate": "owner_or_heir_only",
+    "notes": "Official CSV; discovery only. Do not imply entitlement."
+  },
+  {
+    "id": "ca_unclaimed_property",
+    "official_url": "https://www.sco.ca.gov/upd_download_property_records.html",
+    "machine_readable": "weekly ZIP/CSV",
+    "ingestion": "implemented_live_and_file",
+    "action_gate": "agreement_and_law_review",
+    "notes": "Official public CSV archives updated Thursdays. Direct owner/heir claims are free; covered investigator fees generally capped at 10%."
+  },
+  {
+    "id": "ny_unclaimed_property",
+    "official_url": "https://www.osc.ny.gov/unclaimed-funds/resources/location-service-providers",
+    "machine_readable": "quarterly secure-download delimited file after request",
+    "ingestion": "implemented_file_only",
+    "action_gate": "agreement_required",
+    "notes": "Do not bypass the request flow. OSC states owner agreement/notarization requirements and 15% maximum fee."
+  },
+  {
+    "id": "uspto_official_gazette",
+    "official_url": "https://www.uspto.gov/learning-and-resources/official-gazette",
+    "machine_readable": "html",
+    "ingestion": "implemented",
+    "action_gate": "public_intelligence_only",
+    "notes": "Indexes license/sale notices and maintenance-fee expiration signals. Verify live patent status before commercial use."
+  },
+  {
+    "id": "uspto_open_data",
+    "official_url": "https://data.uspto.gov/",
+    "machine_readable": true,
+    "ingestion": "credential_gate",
+    "action_gate": "public_intelligence_only",
+    "credential": "USPTO_API_KEY",
+    "notes": "USPTO ODP requires sign-in as of June 18, 2026; patent assignment export moved to ODP July 24, 2026. v0.6 plans credential-gated assignment/status tasks and does not bypass authentication."
+  },
+  {
+    "id": "flc_license_notices",
+    "official_url": "https://federallabs.org/flc-business/notice-of-intent-to-license",
+    "machine_readable": "html",
+    "ingestion": "implemented",
+    "action_gate": "public_intelligence_only"
+  },
+  {
+    "id": "companies_house",
+    "official_url": "https://developer.company-information.service.gov.uk/",
+    "machine_readable": true,
+    "ingestion": "dissolved_company_ingestion_and_read_only_research",
+    "action_gate": "public_intelligence_only",
+    "credential": "COMPANIES_HOUSE_API_KEY",
+    "notes": "Supports dissolved-company search and second-hop read-only profile, filing-history, officer, PSC and insolvency research. API key required."
+  },
+  {
+    "id": "usaspending",
+    "official_url": "https://api.usaspending.gov/",
+    "machine_readable": true,
+    "ingestion": "query_client",
+    "action_gate": "public_intelligence_only"
+  },
+  {
+    "id": "mlc_data",
+    "official_url": "https://www.themlc.com/dataprograms",
+    "machine_readable": true,
+    "ingestion": "implemented_authorized_file_import",
+    "action_gate": "public_intelligence_only",
+    "notes": "Bulk Data Access/Public Search API require appropriate Data Access Hub enrollment/access. FIA imports authorized metadata/reconciliation files and does not claim royalties."
+  },
+  {
+    "id": "soundexchange_unclaimed",
+    "official_url": "https://www.soundexchange.com/what-we-do/for-artists-labels-and-producers/",
+    "machine_readable": "public search/lists",
+    "ingestion": "implemented_public_status_file_import",
+    "action_gate": "owner_or_rightsholder_only",
+    "notes": "Imports public unclaimed-status signals for reconciliation. The underlying royalties remain claimable by qualifying creators/rightsholders."
+  },
+  {
+    "id": "us_bankruptcy_unclaimed",
+    "official_url": "https://ucf.uscourts.gov/",
+    "machine_readable": "interactive federated search with CAPTCHA",
+    "ingestion": "implemented_manual_or_court_export_only",
+    "action_gate": "court_entitlement_review_required",
+    "notes": "Do not automate around CAPTCHA. U.S. Courts says funds may be claimed by an owner, successor, or other claimant who proves a right; local court procedures control."
+  },
+  {
+    "id": "treasury_unpaid_checks_foia",
+    "official_url": "https://fiscal.treasury.gov/about-us/unclaimed-assets",
+    "machine_readable": "FOIA/agency file",
+    "ingestion": "implemented_file_only",
+    "action_gate": "agency_payee_confirmation_and_locator_law_review",
+    "notes": "Treasury cancellation listings identify check symbols, numbers and amounts, not payees. FIA requires certifying-agency payee confirmation."
+  },
+  {
+    "id": "sam_contract_opportunities",
+    "official_url": "https://sam.gov/data-services/Contract%20Opportunities/datagov?privacy=Public",
+    "machine_readable": "public CSV/file extract",
+    "ingestion": "implemented_file_only",
+    "action_gate": "public_intelligence_only",
+    "notes": "Procurement intelligence only. Bid eligibility/registration is a separate process."
+  },
+  {
+    "id": "uk_bona_vacantia_company_assets",
+    "official_url": "https://www.gov.uk/claiming-money-or-property-from-dissolved-company/buy-dissolved-company-assets",
+    "machine_readable": false,
+    "ingestion": "derived_route_from_dissolved_company_ip_anomaly",
+    "action_gate": "title_valuation_and_official_purchase_review",
+    "notes": "Dissolved-company IP may pass to the Crown. Anyone may refer certain assets, but BVD confirms title and decides disposition."
+  },
+  {
+    "id": "official_surplus_funds",
+    "official_url": "dynamic:official-source-url-required-at-ingest",
+    "machine_readable": "official CSV/TXT/ZIP when available",
+    "ingestion": "implemented_file_only",
+    "action_gate": "jurisdiction_specific_entitlement_fee_and_assignment_review",
+    "notes": "Generic provenance-preserving importer. No national fee cap, priority, deadline, or assignment rule is assumed."
+  }
+]

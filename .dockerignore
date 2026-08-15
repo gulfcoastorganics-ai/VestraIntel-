@@ -1,0 +1,8 @@
+.git
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+data/fia.sqlite3
+data/raw/*
+data/exports/*
