@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import io
 import tempfile
-import zipfile
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -30,12 +28,15 @@ class CaliforniaUnclaimedProperty:
     def fetch(self, *, bucket: str = "500_plus") -> Iterable[Opportunity]:
         if bucket not in BUCKET_URLS:
             raise ValueError(f"Unknown California bucket: {bucket}")
-        response = self.client.get(BUCKET_URLS[bucket], follow_redirects=True, timeout=180)
-        response.raise_for_status()
-        with tempfile.NamedTemporaryFile(suffix=".zip") as tmp:
-            tmp.write(response.content)
-            tmp.flush()
-            yield from self.from_path(Path(tmp.name))
+        with self.client.stream(
+            "GET", BUCKET_URLS[bucket], follow_redirects=True, timeout=180
+        ) as response:
+            response.raise_for_status()
+            with tempfile.NamedTemporaryFile(suffix=".zip") as tmp:
+                for chunk in response.iter_bytes(chunk_size=64 * 1024):
+                    tmp.write(chunk)
+                tmp.flush()
+                yield from self.from_path(Path(tmp.name))
 
     def from_path(self, path: Path) -> Iterable[Opportunity]:
         rows = read_tabular_path(path)

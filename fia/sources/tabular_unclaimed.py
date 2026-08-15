@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import csv
 import hashlib
 import io
@@ -99,33 +100,50 @@ def _row_id(row: dict[str, Any], owner_name: str | None) -> str:
     return hashlib.sha256(stable.encode("utf-8", "replace")).hexdigest()[:24]
 
 
-def read_tabular_path(path: Path) -> list[dict[str, str]]:
-    """Read CSV/TXT or a ZIP containing one or more delimited text files."""
-    raw_files: list[tuple[str, bytes]] = []
+_SAMPLE_BYTES = 64 * 1024
+
+
+def _text_format(sample: bytes) -> tuple[str, Any]:
+    try:
+        decoded = codecs.getincrementaldecoder("utf-8-sig")().decode(sample, final=False)
+        encoding = "utf-8-sig"
+    except UnicodeDecodeError:
+        decoded = sample.decode("cp1252", errors="replace")
+        encoding = "cp1252"
+    try:
+        dialect = csv.Sniffer().sniff(decoded, delimiters=",\t|;")
+    except csv.Error:
+        dialect = csv.excel
+    return encoding, dialect
+
+
+def _iter_delimited_rows(text_stream: Iterable[str], dialect: Any) -> Iterable[dict[str, str]]:
+    reader = csv.DictReader(text_stream, dialect=dialect)
+    for row in reader:
+        if row and any(str(v or "").strip() for v in row.values()):
+            yield {str(k): str(v or "") for k, v in row.items() if k is not None}
+
+
+def read_tabular_path(path: Path) -> Iterable[dict[str, str]]:
+    """Yield rows from CSV/TXT files or ZIP members without materializing the dataset."""
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as zf:
-            for name in zf.namelist():
-                if name.lower().endswith((".csv", ".txt")) and not name.endswith("/"):
-                    raw_files.append((name, zf.read(name)))
-    else:
-        raw_files.append((path.name, path.read_bytes()))
+            for info in zf.infolist():
+                if info.is_dir() or not info.filename.lower().endswith((".csv", ".txt")):
+                    continue
+                with zf.open(info, "r") as member:
+                    encoding, dialect = _text_format(member.read(_SAMPLE_BYTES))
+                with zf.open(info, "r") as member:
+                    with io.TextIOWrapper(
+                        member, encoding=encoding, errors="replace", newline=""
+                    ) as text_stream:
+                        yield from _iter_delimited_rows(text_stream, dialect)
+        return
 
-    rows: list[dict[str, str]] = []
-    for _name, payload in raw_files:
-        try:
-            text = payload.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            text = payload.decode("cp1252", errors="replace")
-        sample = text[:8192]
-        try:
-            dialect = csv.Sniffer().sniff(sample, delimiters=",\t|;")
-        except csv.Error:
-            dialect = csv.excel
-        reader = csv.DictReader(io.StringIO(text), dialect=dialect)
-        for row in reader:
-            if row and any(str(v or "").strip() for v in row.values()):
-                rows.append({str(k): str(v or "") for k, v in row.items() if k is not None})
-    return rows
+    with path.open("rb") as raw:
+        encoding, dialect = _text_format(raw.read(_SAMPLE_BYTES))
+    with path.open("r", encoding=encoding, errors="replace", newline="") as text_stream:
+        yield from _iter_delimited_rows(text_stream, dialect)
 
 
 def normalize_unclaimed_rows(

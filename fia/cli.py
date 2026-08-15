@@ -60,8 +60,7 @@ def _ingest(source_id: str, items) -> int:
     db = _db()
     run_id = db.begin_run(source_id)
     try:
-        materialized = list(items)
-        stats = db.upsert_with_stats(materialized)
+        stats = db.upsert_with_stats(items)
         db.finish_run(
             run_id,
             record_count=stats.total,

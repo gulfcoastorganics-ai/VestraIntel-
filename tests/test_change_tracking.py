@@ -29,3 +29,21 @@ def test_change_tracking(tmp_path: Path):
     rows = db.recent_changes(limit=10)
     assert rows[0]["change_count"] == 1
     assert rows[0]["title"] == "Version two"
+
+
+def test_upsert_with_stats_consumes_an_opportunity_generator(tmp_path: Path):
+    db = Database(tmp_path / "fia.sqlite3")
+    consumed: list[int] = []
+
+    def opportunities():
+        for index in range(3):
+            consumed.append(index)
+            opportunity = item(f"Streamed {index}")
+            opportunity.external_id = str(index)
+            yield opportunity
+
+    stats = db.upsert_with_stats(opportunities())
+
+    assert consumed == [0, 1, 2]
+    assert (stats.total, stats.new, stats.changed, stats.unchanged) == (3, 3, 0, 0)
+    assert len(db.list_opportunities(limit=10)) == 3

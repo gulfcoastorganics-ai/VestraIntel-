@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from fia.db import Database, UpsertStats
+from fia.models import Opportunity
 from fia.source_orchestration import (
     SOURCE_POLICIES,
     SourceOrchestratorConfig,
@@ -64,6 +65,39 @@ def test_execute_records_success_and_next_due(tmp_path: Path):
     assert state['last_status']=='completed'
     assert state['next_due_at'] is not None
     assert db.list_source_sync_events()[0]['status']=='completed'
+
+
+def test_california_streamed_ingestion_records_orchestration_counts(tmp_path: Path, monkeypatch):
+    db = Database(tmp_path / "fia.sqlite3")
+
+    def streamed_fetch(self, *, bucket="500_plus"):
+        for index in range(4):
+            yield Opportunity(
+                source_id="ca_unclaimed_property",
+                external_id=f"CA-{index}",
+                asset_class="unclaimed_funds",
+                title=f"California streamed record {index}",
+                jurisdiction="California, USA",
+                custodian="California State Controller's Office",
+                source_url="https://www.sco.ca.gov/upd_download_property_records.html",
+                legal_model="licensed_locator",
+            )
+
+    monkeypatch.setattr(
+        "fia.source_orchestration.CaliforniaUnclaimedProperty.fetch", streamed_fetch
+    )
+    stats = run_source_orchestrator(
+        db,
+        SourceOrchestratorConfig(
+            dry_run=False, source_ids=("ca_unclaimed_property",), max_sources=1
+        ),
+        now=datetime(2026, 8, 14, 20, tzinfo=timezone.utc),
+    )
+
+    assert stats.completed_sources == ("ca_unclaimed_property",)
+    assert (stats.total_records, stats.new_records, stats.changed_records) == (4, 4, 0)
+    event = db.list_source_sync_events()[0]
+    assert (event["record_count"], event["new_count"], event["changed_count"]) == (4, 4, 0)
 
 
 def test_stream_normalizer_only_keeps_cessations():
