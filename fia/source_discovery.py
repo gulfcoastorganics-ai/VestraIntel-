@@ -537,7 +537,7 @@ def _catalog_miners(client: httpx.Client) -> dict[str, Any]:
     settings = load_settings()
     return {
         "us_data_gov": DataGovMiner(client, api_key=settings.data_gov_api_key),
-        "uk_data_gov": CKANMiner(client, catalog_id="uk_data_gov", jurisdiction="United Kingdom", base_url="https://data.gov.uk"),
+        "uk_data_gov": CKANMiner(client, catalog_id="uk_data_gov", jurisdiction="United Kingdom", base_url="https://www.data.gov.uk"),
         "ca_open_government": CKANMiner(client, catalog_id="ca_open_government", jurisdiction="Canada", base_url="https://open.canada.ca/data"),
         "eu_data_portal": EUDataPortalMiner(client),
     }

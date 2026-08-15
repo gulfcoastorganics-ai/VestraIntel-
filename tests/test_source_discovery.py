@@ -10,6 +10,7 @@ from fia.source_discovery import (
     EUDataPortalMiner,
     SourceMiningConfig,
     _candidate,
+    _catalog_miners,
     _safe_scalar,
     infer_monetization_route,
     mine_source_catalogs,
@@ -187,6 +188,30 @@ def test_ckan_normalizer_handles_public_catalog():
     assert rows[0].publisher == "Example Court"
     assert rows[0].overall_score > 40
     assert rows[0].monetization_route == "locator_fee_review"
+
+
+def test_uk_catalog_uses_www_endpoint_instead_of_redirecting_host():
+    payload = {"success": True, "result": {"results": [{
+        "id": "uk-current-endpoint",
+        "title": "Unclaimed property records",
+        "resources": [{"format": "CSV"}],
+    }]}}
+    requested_hosts: list[str] = []
+
+    def handler(request: httpx.Request):
+        requested_hosts.append(request.url.host)
+        if request.url.host == "data.gov.uk":
+            return httpx.Response(
+                301,
+                headers={"location": f"https://www.data.gov.uk{request.url.raw_path.decode()}"},
+            )
+        return httpx.Response(200, json=payload)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        rows = _catalog_miners(client)["uk_data_gov"].search("unclaimed property", 1)
+
+    assert len(rows) == 1
+    assert requested_hosts == ["www.data.gov.uk"]
 
 
 def test_eu_search_normalizer_handles_multilingual_title():
