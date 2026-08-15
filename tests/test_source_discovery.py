@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import httpx
@@ -9,10 +10,65 @@ from fia.source_discovery import (
     EUDataPortalMiner,
     SourceMiningConfig,
     _candidate,
+    _safe_scalar,
     infer_monetization_route,
     mine_source_catalogs,
     score_candidate,
 )
+
+
+def test_safe_scalar_extracts_catalog_metadata():
+    assert _safe_scalar(None) is None
+    assert _safe_scalar("value") == "value"
+    assert _safe_scalar(7) == "7"
+    assert _safe_scalar([None, "", "https://example.gov/landing"]) == "https://example.gov/landing"
+    assert _safe_scalar({"fr": "Français", "en": "English"}) == "English"
+    assert _safe_scalar({"license": [{"href": "https://example.gov/license"}]}) == "https://example.gov/license"
+    assert _safe_scalar([]) is None
+    assert _safe_scalar({}) is None
+
+
+def test_candidate_normalizes_all_external_scalar_columns():
+    candidate = _candidate(
+        catalog_id="test", jurisdiction="Test",
+        external_id={"id": "external-1"}, title={"en": "English", "fr": "Français"},
+        description=[{"label": "Description"}], publisher={"name": "Publisher"},
+        landing_url=[None, {"url": "https://example.gov/landing"}],
+        metadata_url=[{"href": "https://example.gov/metadata"}],
+        access_level=["public"], license_value=[{"title": "Open Licence"}],
+        modified_at=[{"en": "2026-08-15"}], update_frequency={"label": "weekly"},
+        formats=["CSV"], keywords=["unclaimed"], raw={"landingPage": ["a", "b"]},
+    )
+
+    assert candidate.landing_url == "https://example.gov/landing"
+    assert candidate.metadata_url == "https://example.gov/metadata"
+    assert candidate.license == "Open Licence"
+    record = candidate.as_record()
+    structured_columns = {"formats_json", "keywords_json", "reason_json", "raw_json"}
+    assert all(
+        not isinstance(value, (list, dict))
+        for key, value in record.items()
+        if key not in structured_columns
+    )
+    assert all(isinstance(record[key], str) for key in structured_columns)
+
+
+def test_db_upsert_accepts_candidate_from_list_valued_metadata(tmp_path: Path):
+    db = Database(tmp_path / "fia.sqlite3")
+    candidate = _candidate(
+        catalog_id="test", jurisdiction="Test", external_id=[{"id": "external-1"}],
+        title=[{"en": "Unclaimed funds"}], description=["Public CSV"],
+        landing_url=["https://example.gov/a", "https://example.gov/b"],
+        metadata_url=["https://example.gov/metadata"],
+        license_value={"url": "https://example.gov/license", "title": "Open Licence"},
+        formats=["CSV"], keywords=["unclaimed funds"], raw={"landingPage": ["a", "b"]},
+    )
+
+    assert db.upsert_source_candidates([candidate]) == 1
+    row = db.list_source_candidates(state=None)[0]
+    assert row["landing_url"] == "https://example.gov/a"
+    assert row["metadata_url"] == "https://example.gov/metadata"
+    assert row["license"] == "https://example.gov/license"
 
 
 def test_scoring_prefers_asset_dense_machine_readable_source():
@@ -76,6 +132,42 @@ def test_datagov_normalizer_uses_dcat_metadata():
     assert rows[0].catalog_id == "us_data_gov"
     assert "CSV" in rows[0].formats
     assert rows[0].monetization_route == "locator_fee_review"
+
+
+def test_mining_saves_list_valued_official_catalog_metadata_without_flattening_raw(tmp_path: Path):
+    original_landing_pages = ["https://example.gov/a", "https://example.gov/b"]
+    payload = {"results": [{
+        "identifier": "abc-list-landing",
+        "title": "Unclaimed property records",
+        "description": "Public records",
+        "keyword": ["unclaimed property"],
+        "dcat": {
+            "accessLevel": "public",
+            "landingPage": original_landing_pages,
+            "distribution": [{"format": "CSV"}],
+        },
+    }]}
+
+    def handler(request: httpx.Request):
+        return httpx.Response(200, json=payload)
+
+    db = Database(tmp_path / "fia.sqlite3")
+    with httpx.Client(transport=httpx.MockTransport(handler)) as catalog_client:
+        stats = mine_source_catalogs(
+            db,
+            SourceMiningConfig(
+                catalog_ids=("us_data_gov",), queries=("unclaimed property",),
+                results_per_query=5,
+            ),
+            miner_factory=lambda client: {
+                "us_data_gov": DataGovMiner(catalog_client, api_key="test-key")
+            },
+        )
+
+    assert stats.saved == 1
+    row = db.list_source_candidates(state=None)[0]
+    assert row["landing_url"] == "https://example.gov/a"
+    assert json.loads(row["raw_json"])["dcat"]["landingPage"] == original_landing_pages
 
 
 def test_ckan_normalizer_handles_public_catalog():

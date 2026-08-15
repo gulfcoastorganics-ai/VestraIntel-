@@ -104,6 +104,46 @@ MACHINE_FORMAT_WEIGHTS: dict[str, float] = {
 }
 
 
+_SCALAR_METADATA_KEYS: tuple[str, ...] = (
+    "en",
+    "url",
+    "uri",
+    "href",
+    "name",
+    "label",
+    "title",
+    "id",
+)
+
+
+def _safe_scalar(value: Any) -> str | None:
+    """Extract a SQLite-safe scalar string from external catalog metadata."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            scalar = _safe_scalar(item)
+            if scalar is not None and scalar.strip():
+                return scalar
+        return None
+    if isinstance(value, dict):
+        for key in _SCALAR_METADATA_KEYS:
+            if key in value:
+                scalar = _safe_scalar(value[key])
+                if scalar is not None and scalar.strip():
+                    return scalar
+        for item in value.values():
+            scalar = _safe_scalar(item)
+            if scalar is not None and scalar.strip():
+                return scalar
+        return None
+    return str(value)
+
+
 @dataclass(frozen=True)
 class SourceCandidate:
     catalog_id: str
@@ -320,13 +360,23 @@ def _formats_from_distributions(distributions: Any) -> tuple[str, ...]:
 
 
 def _candidate(
-    *, catalog_id: str, jurisdiction: str, external_id: str, title: str, description: str = "",
-    publisher: str | None = None, landing_url: str | None = None, metadata_url: str | None = None,
-    access_level: str | None = "public", license_value: str | None = None,
+    *, catalog_id: str, jurisdiction: str, external_id: Any, title: Any, description: Any = "",
+    publisher: Any = None, landing_url: Any = None, metadata_url: Any = None,
+    access_level: Any = "public", license_value: Any = None,
     formats: Iterable[str] = (), keywords: Iterable[str] = (), modified_at: str | None = None,
-    update_frequency: str | None = None, popularity: int | float | None = None,
+    update_frequency: Any = None, popularity: int | float | None = None,
     raw: dict[str, Any] | None = None,
 ) -> SourceCandidate:
+    external_id = _safe_scalar(external_id) or ""
+    title = _safe_scalar(title) or "Untitled dataset"
+    description = _safe_scalar(description) or ""
+    publisher = _safe_scalar(publisher)
+    landing_url = _safe_scalar(landing_url)
+    metadata_url = _safe_scalar(metadata_url)
+    access_level = _safe_scalar(access_level)
+    license_value = _safe_scalar(license_value)
+    modified_at = _safe_scalar(modified_at)
+    update_frequency = _safe_scalar(update_frequency)
     fmt = tuple(sorted({str(x).upper() for x in formats if x}))
     keys = tuple(sorted({str(x).strip() for x in keywords if str(x).strip()}))
     scores, reasons = score_candidate(
@@ -371,13 +421,13 @@ class DataGovMiner:
                 m = re.search(r"\b(API|CSV|JSONL?|XML|XLSX?|ZIP|SPARQL)\b", str(title), re.I)
                 if m:
                     formats.append(m.group(1).upper())
-            external = str(item.get("identifier") or item.get("slug") or item.get("harvest_record") or item.get("title"))
+            external = item.get("identifier") or item.get("slug") or item.get("harvest_record") or item.get("title")
             org = item.get("organization") or {}
             out.append(_candidate(
                 catalog_id=self.catalog_id, jurisdiction="United States", external_id=external,
-                title=str(item.get("title") or "Untitled dataset"),
-                description=str(item.get("description") or dcat.get("description") or ""),
-                publisher=str(item.get("publisher") or org.get("name") or "") or None,
+                title=item.get("title") or "Untitled dataset",
+                description=item.get("description") or dcat.get("description") or "",
+                publisher=item.get("publisher") or org.get("name"),
                 landing_url=dcat.get("landingPage") or item.get("harvest_record_raw"),
                 metadata_url=item.get("harvest_record"), access_level=dcat.get("accessLevel") or "public",
                 license_value=dcat.get("license"), formats=formats,
@@ -412,9 +462,9 @@ class CKANMiner:
                 landing = f"{self.base_url}/dataset/{item['name']}"
             out.append(_candidate(
                 catalog_id=self.catalog_id, jurisdiction=self.jurisdiction,
-                external_id=str(item.get("id") or item.get("name") or item.get("title")),
-                title=str(item.get("title") or item.get("name") or "Untitled dataset"),
-                description=str(item.get("notes") or ""),
+                external_id=item.get("id") or item.get("name") or item.get("title"),
+                title=item.get("title") or item.get("name") or "Untitled dataset",
+                description=item.get("notes") or "",
                 publisher=((item.get("organization") or {}).get("title") if isinstance(item.get("organization"), dict) else None),
                 landing_url=landing, metadata_url=(f"{self.base_url}/api/action/package_show?id={item.get('id')}" if item.get("id") else None),
                 access_level="public", license_value=item.get("license_url") or item.get("license_title"),
@@ -446,28 +496,17 @@ class EUDataPortalMiner:
         for item in raw_results if isinstance(raw_results, list) else []:
             if not isinstance(item, dict):
                 continue
-            title_value = item.get("title")
-            if isinstance(title_value, dict):
-                title = str(title_value.get("en") or next(iter(title_value.values()), "Untitled dataset"))
-            else:
-                title = str(title_value or "Untitled dataset")
-            desc_value = item.get("description")
-            if isinstance(desc_value, dict):
-                description = str(desc_value.get("en") or next(iter(desc_value.values()), ""))
-            else:
-                description = str(desc_value or "")
+            title = item.get("title") or "Untitled dataset"
+            description = item.get("description") or ""
             distributions = item.get("distributions") or item.get("distribution") or []
             formats = _formats_from_distributions(distributions)
-            publisher = item.get("publisher")
-            if isinstance(publisher, dict):
-                publisher = publisher.get("name") or publisher.get("label")
             out.append(_candidate(
                 catalog_id=self.catalog_id, jurisdiction="European Union",
-                external_id=str(item.get("id") or item.get("identifier") or item.get("uri") or title),
-                title=title, description=description, publisher=str(publisher) if publisher else None,
+                external_id=item.get("id") or item.get("identifier") or item.get("uri") or title,
+                title=title, description=description, publisher=item.get("publisher"),
                 landing_url=item.get("landingPage") or item.get("landing_page") or item.get("uri"),
                 metadata_url=item.get("uri") or item.get("id"), access_level="public",
-                license_value=item.get("license") if isinstance(item.get("license"), str) else None,
+                license_value=item.get("license"),
                 formats=formats, keywords=item.get("keywords") or item.get("keyword") or (),
                 modified_at=item.get("modified") or item.get("issued"), update_frequency=item.get("accrualPeriodicity"), raw=item,
             ))
